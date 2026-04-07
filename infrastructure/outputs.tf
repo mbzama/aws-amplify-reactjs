@@ -1,55 +1,32 @@
 # ============================================================
 # Outputs
 # ============================================================
-# These values are printed after every successful `terraform apply`
-# and are also retrievable with `terraform output`.
-# ============================================================
-
-# ------------------------------------------------------------
-# Amplify
-# ------------------------------------------------------------
 
 output "amplify_app_id" {
-  description = "The unique Amplify application ID (e.g. d1abc2def3ghi). Used to construct console URLs and as an identifier in other AWS resources."
+  description = "Unique Amplify application ID — use this to find your app in the Console."
   value       = aws_amplify_app.app.id
 }
 
 output "amplify_default_domain" {
-  description = "The auto-generated Amplify domain (e.g. main.d1abc2def3ghi.amplifyapp.com). Useful for testing before the custom domain is fully propagated."
+  description = "Auto-generated Amplify URL for testing before the custom domain is active."
   value       = "${aws_amplify_branch.main.branch_name}.${aws_amplify_app.app.default_domain}"
 }
 
 output "amplify_app_url" {
-  description = "The live URL of the deployed application on the custom domain."
+  description = "Live URL after custom domain and SSL are fully activated."
   value       = "https://app-dev.zamait.com"
 }
 
-# ------------------------------------------------------------
-# ACM Certificate
-# ------------------------------------------------------------
-
-output "acm_certificate_arn" {
-  description = "ARN of the ACM certificate for app-dev.zamait.com. Reference this in other AWS resources (e.g. CloudFront distributions) that require the cert."
-  value       = aws_acm_certificate.app.arn
-}
-
-output "acm_validation_cname_name" {
-  description = "The CNAME record NAME you must add to GoDaddy DNS to allow ACM to validate domain ownership. Copy this value exactly — it includes a trailing dot."
-  value = tolist([
-    for dvo in aws_acm_certificate.app.domain_validation_options :
-    dvo.resource_record_name
-  ])[0]
-}
-
-output "acm_validation_cname_value" {
-  description = "The CNAME record VALUE (target) you must add to GoDaddy DNS alongside the CNAME name above. Copy this value exactly — it includes a trailing dot."
-  value = tolist([
-    for dvo in aws_acm_certificate.app.domain_validation_options :
-    dvo.resource_record_value
-  ])[0]
-}
-
-output "acm_validation_instructions" {
-  description = "Human-readable reminder of what to do with the CNAME outputs above."
-  value       = "Add a CNAME record in GoDaddy: Name = acm_validation_cname_name (strip the trailing dot and the .zamait.com suffix if GoDaddy adds the root domain automatically), Value = acm_validation_cname_value (strip the trailing dot)."
+output "amplify_next_steps" {
+  description = "What to do after terraform apply to activate the custom domain."
+  value       = <<-EOT
+    1. Open: https://console.aws.amazon.com/amplify/home
+    2. Select your app → Hosting → Custom domains → app-dev.zamait.com
+    3. Copy the two CNAME records shown (SSL validation + domain routing)
+    4. Add both to GoDaddy: DNS Management → Add → CNAME
+       - Strip '.zamait.com' from the Name field (GoDaddy appends it)
+       - Strip trailing dots from the Value field
+    5. Click 'Retry activation' in Amplify Console
+    6. Wait 5-30 minutes for SSL status to show 'Active'
+  EOT
 }

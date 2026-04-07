@@ -1,63 +1,30 @@
 # ============================================================
-# ACM TLS Certificate — app-dev.zamait.com
+# ACM Certificate — managed by Amplify
 # ============================================================
-# AWS Certificate Manager (ACM) issues a free, auto-renewing TLS
-# certificate for the custom domain.  We use DNS validation so there
-# is no manual email approval step.
+# With certificate_settings { type = "AMPLIFY_MANAGED" } in amplify.tf,
+# Amplify automatically requests and manages an ACM certificate in
+# us-east-1 for app-dev.zamait.com.
 #
-# IMPORTANT — Region requirement:
-#   AWS Amplify's custom-domain feature (like CloudFront) can only use
-#   ACM certificates that live in us-east-1.  The provider.tf file
-#   already sets this region, so no alias provider is needed here.
-# ============================================================
-
-resource "aws_acm_certificate" "app" {
-  # The primary domain name for the certificate
-  domain_name = "app-dev.zamait.com"
-
-  # DNS validation is preferred over EMAIL validation because:
-  #  - It does not require access to an email inbox
-  #  - It can be fully automated
-  #  - ACM auto-renews the cert as long as the CNAME record stays in DNS
-  validation_method = "DNS"
-
-  lifecycle {
-    # Terraform creates the replacement certificate before destroying the
-    # old one so there is zero downtime during cert renewals.
-    create_before_destroy = true
-  }
-}
-
-# ============================================================
-# DNS Validation Record Details
-# ============================================================
-# ACM generates a unique CNAME record that proves you own the domain.
-# You must add this record to your DNS provider (GoDaddy in this case)
-# before ACM will issue the certificate.
+# You do NOT need to create a manual ACM resource here.
+# Amplify will show the required CNAME validation record in:
+#   Amplify Console → App → Hosting → Custom domains
 #
-# The record name and value are exposed as Terraform outputs so you
-# can copy-paste them directly into GoDaddy's DNS management panel.
+# Steps after terraform apply:
+#   1. Open Amplify Console → your app → Hosting → Custom domains
+#   2. Click "app-dev.zamait.com" → you will see two CNAME records:
 #
-# Once the record is added, ACM validates automatically (usually within
-# 5–30 minutes) and the certificate status changes to "Issued".
+#      a) SSL certificate validation CNAME (looks like):
+#         Name:  _abc123.app-dev.zamait.com
+#         Value: _xyz789.acm-validations.aws.
+#
+#      b) Domain routing CNAME:
+#         Name:  app-dev.zamait.com   (or just "app-dev" as host in GoDaddy)
+#         Value: <branch>.d3xxxxxxx.amplifyapp.com
+#
+#   3. Add BOTH CNAMEs to GoDaddy DNS (DNS Management → Add Record → CNAME)
+#      For the Name field in GoDaddy, use only the subdomain part:
+#        e.g. "_abc123.app-dev" (strip ".zamait.com" from the end)
+#
+#   4. Click "Retry activation" in Amplify Console
+#   5. Wait 5–30 minutes for SSL status to show "Active"
 # ============================================================
-
-# This resource instructs Terraform to wait until ACM has finished
-# validating and the certificate reaches "Issued" status.
-# It does NOT create any DNS records — you must add them manually in GoDaddy.
-resource "aws_acm_certificate_validation" "app" {
-  certificate_arn = aws_acm_certificate.app.arn
-
-  # List every FQDN that needs a validation CNAME.
-  # For a single-domain cert there is exactly one entry.
-  validation_record_fqdns = [
-    for dvo in aws_acm_certificate.app.domain_validation_options :
-    dvo.resource_record_name
-  ]
-
-  # ACM validation can take up to 30 minutes after you add the CNAME.
-  # Terraform will poll until the cert is issued or this timeout expires.
-  timeouts {
-    create = "45m"
-  }
-}

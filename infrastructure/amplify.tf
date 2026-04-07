@@ -64,28 +64,29 @@ resource "aws_amplify_branch" "main" {
 # ------------------------------------------------------------
 # 3. Custom Domain — app-dev.zamait.com
 # ------------------------------------------------------------
-# This resource tells Amplify to serve traffic for the custom domain
-# and wire it to the Amplify CDN.  Amplify will also create its own
-# DNS validation records internally; the ACM certificate you provisioned
-# in acm-certificate.tf provides the TLS layer.
+# AMPLIFY_MANAGED certificate: Amplify automatically requests and
+# manages an ACM certificate in us-east-1 for app-dev.zamait.com.
 #
-# NOTE: After applying, Amplify will show additional CNAME records in the
-# Amplify Console (under "Domain management") that you must also add to
-# GoDaddy so that app-dev.zamait.com resolves to Amplify's CDN.
+# After applying, Amplify Console → Domain Management will show:
+#   - One CNAME for SSL certificate validation  → add to GoDaddy
+#   - One CNAME to point the domain to Amplify  → add to GoDaddy
+#
+# Once both CNAMEs are in GoDaddy, click "Retry activation" in the
+# Amplify Console.  SSL status will change to Active within 30 min.
 # ------------------------------------------------------------
 resource "aws_amplify_domain_association" "app" {
   app_id      = aws_amplify_app.app.id
   domain_name = "app-dev.zamait.com"
 
+  # Use Amplify-managed certificate — Amplify provisions and renews
+  # the ACM cert automatically. No manual ACM resource needed.
+  certificate_settings {
+    type = "AMPLIFY_MANAGED"
+  }
+
   # Map the root of the custom domain to the main branch
   sub_domain {
-    # An empty prefix means the apex/root domain (app-dev.zamait.com)
     branch_name = aws_amplify_branch.main.branch_name
     prefix      = ""
   }
-
-  # Amplify requires the ACM certificate to be issued before it can
-  # activate the custom domain.  Depend on the validation resource so
-  # Terraform waits for the cert to reach "Issued" status first.
-  depends_on = [aws_acm_certificate_validation.app]
 }
